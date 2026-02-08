@@ -1,6 +1,6 @@
 # Backend Dockerfile for Node.js Telegram Scraper
 
-FROM node:20-alpine
+FROM node:20-bullseye
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3001/health || exit 1
+  CMD curl -f http://localhost:3001/health || exit 1
 
 # Start application
 ENV NODE_ENV=production
