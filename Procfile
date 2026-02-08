@@ -1,3 +1,3 @@
-web: npm --prefix frontend run build && npm --prefix frontend start
-api: npm --prefix backend/telegram-scraper start
-scheduler: npm --prefix backend/telegram-scraper run schedule
+web: cd frontend && npm install && npm run build && npm start
+api: cd backend/telegram-scraper && npm install && npm start
+scheduler: cd backend/telegram-scraper && npm install && npm run schedule
