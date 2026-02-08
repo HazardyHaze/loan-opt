@@ -5,7 +5,7 @@ services:
       repo: your-username/loan-scholar-opt
       branch: main
       deploy_on_push: true
-    build_command: npm --prefix frontend run build
+    build_command: npm --prefix frontend install && npm --prefix frontend run build
     run_command: npm --prefix frontend start
     http_port: 3000
     envs:
@@ -40,6 +40,7 @@ services:
     build_command: npm --prefix backend/telegram-scraper install
     run_command: npm --prefix backend/telegram-scraper start
     http_port: 3001
+    environment_slug: node-js
     envs:
       - key: SUPABASE_URL
         scope: RUN_AND_BUILD_TIME
