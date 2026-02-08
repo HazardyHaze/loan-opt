@@ -5,8 +5,8 @@ services:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: bash build-frontend.sh
-    run_command: bash start-frontend.sh
+    build_command: cd frontend && npm install && npm run build
+    run_command: cd frontend && npm start
     http_port: 3000
     envs:
       - key: NUXT_PUBLIC_SUPABASE_URL
@@ -20,19 +20,14 @@ services:
         value: ${NUXT_API_BASE_URL}
     health_check:
       http_path: /
-    alerts:
-      - rule: CPU_UTILIZATION
-        value: 75
-      - rule: MEM_UTILIZATION
-        value: 80
     
   - name: backend
     github:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: bash build-backend.sh
-    run_command: bash start-backend.sh
+    build_command: cd backend/telegram-scraper && npm install
+    run_command: cd backend/telegram-scraper && npm start
     http_port: 3001
     envs:
       - key: SUPABASE_URL
@@ -55,8 +50,3 @@ services:
         value: production
     health_check:
       http_path: /health
-    alerts:
-      - rule: CPU_UTILIZATION
-        value: 80
-      - rule: MEM_UTILIZATION
-        value: 85
