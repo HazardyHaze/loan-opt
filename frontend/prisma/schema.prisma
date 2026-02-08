@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  admin_id         Int    @id @default(autoincrement())
+  permission_level String
+  email           String @unique
+  phone_no        String
+  password        String
+}
+
+model Student {
+  student_id      Int    @id
+  email           String @unique
+  password        String
+  phone_no        String 
+  gpa             Int
+  family_income   Int
+  academic_level  String
+  institution     String
+  major           String
+  
+  recommendations Recommendation[]
+  applications    Application[]
+}
+
+model Recommendation {`
+  recommendation_id Int      @id @default(autoincrement())
+  student_id        Int
+  product_id        Int
+  match_percentage  Int
+  expiry_date       DateTime
+  
+  student           Student         @relation(fields: [student_id], references: [student_id])
+  financialProduct  FinancialProduct @relation(fields: [product_id], references: [product_id])
+}
+
+model Application {
+  application_id Int    @id @default(autoincrement())
+  student_id     Int
+  product_id     Int
+  status         String
+  reviewed_by    Int?
+  
+  student        Student         @relation(fields: [student_id], references: [student_id])
+  financialProduct FinancialProduct @relation(fields: [product_id], references: [product_id])
+}
+
+model FinancialProduct {
+  product_id        Int    @id @default(autoincrement())
+  name              String
+  type              String
+  amount_range      Float  // Using Float for double type
+  deadline          DateTime
+  eligibility_score String 
+  is_solved          String // Should probably be boolean: is_solved Boolean
+  
+  recommendations Recommendation[]
+  applications    Application[]
+}

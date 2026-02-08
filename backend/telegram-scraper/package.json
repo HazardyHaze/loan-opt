@@ -1,0 +1,32 @@
+{
+  "name": "telegram-scraper",
+  "version": "1.0.0",
+  "description": "Telegram scraper for loan/scholar data",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "schedule": "node src/scheduler.js"
+  },
+  "dependencies": {
+    "@mtproto/core": "^6.3.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
+    "dotenv": "^16.6.1",
+    "input": "^1.0.1",
+    "jsdom": "^27.4.0",
+    "node-cron": "^3.0.3",
+    "puppeteer": "^21.11.0",
+    "telegraf": "^4.16.3",
+    "telegram": "^2.26.22",
+    "telegram-scraper": "^1.0.2",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
