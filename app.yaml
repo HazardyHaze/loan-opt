@@ -5,8 +5,8 @@ services:
       repo: your-username/loan-scholar-opt
       branch: main
       deploy_on_push: true
-    build_command: cd frontend && npm run build
-    run_command: cd frontend && npm start
+    build_command: npm --prefix frontend run build
+    run_command: npm --prefix frontend start
     http_port: 3000
     envs:
       - key: NUXT_PUBLIC_SUPABASE_URL
@@ -34,11 +34,11 @@ services:
     
   - name: backend
     github:
-      repo: your-username/loan-scholar-opt
+      repo: your-username/loan-Scholar-opt
       branch: main
       deploy_on_push: true
-    build_command: cd backend/telegram-scraper && npm install
-    run_command: cd backend/telegram-scraper && npm start
+    build_command: npm --prefix backend/telegram-scraper install
+    run_command: npm --prefix backend/telegram-scraper start
     http_port: 3001
     envs:
       - key: SUPABASE_URL
