@@ -5,7 +5,7 @@ services:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: cd frontend && npm ci && npm run build
+    build_command: cd frontend && npm install --legacy-peer-deps && npm run build
     run_command: cd frontend && npm start
     http_port: 3000
     envs:
@@ -26,7 +26,7 @@ services:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: cd backend/telegram-scraper && npm ci
+    build_command: cd backend/telegram-scraper && npm install
     run_command: cd backend/telegram-scraper && npm start
     http_port: 3001
     envs:
