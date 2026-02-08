@@ -5,8 +5,8 @@ services:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: cd frontend && npm install --ignore-scripts --legacy-peer-deps && npm rebuild && npm run postinstall && npm run build
-    run_command: cd frontend && npm start
+    dockerfile_path: frontend/Dockerfile
+    source_dir: ./
     http_port: 3000
     envs:
       - key: NUXT_PUBLIC_SUPABASE_URL
@@ -26,8 +26,8 @@ services:
       repo: your-username/loan-scholar-opt
       branch: master
       deploy_on_push: true
-    build_command: cd backend/telegram-scraper && npm install --ignore-scripts && npm rebuild
-    run_command: cd backend/telegram-scraper && npm start
+    dockerfile_path: backend/telegram-scraper/Dockerfile
+    source_dir: ./
     http_port: 3001
     envs:
       - key: SUPABASE_URL
