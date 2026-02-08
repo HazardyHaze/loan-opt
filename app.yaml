@@ -1,0 +1,92 @@
+name: loan-scholar-opt
+services:
+  - name: frontend
+    github:
+      repo: your-username/loan-scholar-opt
+      branch: main
+      deploy_on_push: true
+    build_command: cd frontend && npm run build
+    run_command: cd frontend && npm start
+    http_port: 3000
+    envs:
+      - key: NUXT_PUBLIC_SUPABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_URL}
+      - key: NUXT_PUBLIC_SUPABASE_ANON_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_ANON_KEY}
+      - key: NUXT_API_BASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${API_BASE_URL}
+    health_check:
+      http_path: /
+    cors:
+      allow_origins:
+        - match_type: exact
+          exact: https://yourdomain.com
+        - match_type: exact
+          exact: https://www.yourdomain.com
+    alerts:
+      - rule: CPU_UTILIZATION
+        value: 75
+      - rule: MEM_UTILIZATION
+        value: 80
+    
+  - name: backend
+    github:
+      repo: your-username/loan-scholar-opt
+      branch: main
+      deploy_on_push: true
+    build_command: cd backend/telegram-scraper && npm install
+    run_command: cd backend/telegram-scraper && npm start
+    http_port: 3001
+    envs:
+      - key: SUPABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_URL}
+      - key: SUPABASE_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_SERVICE_KEY}
+      - key: TELEGRAM_API_ID
+        scope: RUN_AND_BUILD_TIME
+        value: ${TELEGRAM_API_ID}
+      - key: TELEGRAM_API_HASH
+        scope: RUN_AND_BUILD_TIME
+        value: ${TELEGRAM_API_HASH}
+      - key: PORT
+        scope: RUN_AND_BUILD_TIME
+        value: "3001"
+      - key: NODE_ENV
+        scope: RUN_AND_BUILD_TIME
+        value: production
+    health_check:
+      http_path: /health
+    alerts:
+      - rule: CPU_UTILIZATION
+        value: 80
+      - rule: MEM_UTILIZATION
+        value: 85
+
+databases:
+  - name: supabase-db
+    engine: PG
+    version: "14"
+    production: true
+    envs:
+      - key: SUPABASE_URL
+        value: ${SUPABASE_URL}
+
+static_sites:
+  - source_dir: frontend/public
+    routes:
+      - path: /robots.txt
+      - path: /images
+
+functions:
+  - name: cron-scheduler
+    source_dir: backend/telegram-scraper
+    envs:
+      - key: SUPABASE_URL
+        value: ${SUPABASE_URL}
+      - key: SUPABASE_KEY
+        value: ${SUPABASE_SERVICE_KEY}
