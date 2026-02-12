@@ -352,6 +352,7 @@ class TelegramService {
                         text_content: content.text,
                         html_content: content.html,
                         metadata: content.metadata,
+                        apply_now_link: content.applyNowLink || null,
                         scraped_at: new Date()
                     });
                     
@@ -434,12 +435,56 @@ class TelegramService {
                 published_time: $('meta[property="article:published_time"]').attr('content') || '',
                 site_name: $('meta[property="og:site_name"]').attr('content') || ''
             };
+
+            // Extract "Apply Now" or similar application links
+            let applyNowLink = null;
+            const applySelectors = [
+                'a[href]'
+            ];
+            const applyKeywords = /apply\s*now|mohon\s*sekarang|permohonan|daftar\s*sekarang|register\s*now|submit\s*application|hantar\s*permohonan|klik\s*sini|click\s*here\s*to\s*apply/i;
+
+            for (const selector of applySelectors) {
+                $(selector).each((_, el) => {
+                    if (applyNowLink) return false; // stop once found
+                    const linkText = $(el).text().trim();
+                    const href = $(el).attr('href');
+                    // Check button/link text for "Apply Now" patterns
+                    if (href && linkText && applyKeywords.test(linkText)) {
+                        // Resolve relative URLs
+                        if (href.startsWith('http')) {
+                            applyNowLink = href;
+                        } else if (href.startsWith('/')) {
+                            try {
+                                const base = new URL(url);
+                                applyNowLink = `${base.origin}${href}`;
+                            } catch (e) { /* skip */ }
+                        }
+                    }
+                });
+            }
+
+            // Also check for buttons with apply-related classes
+            if (!applyNowLink) {
+                $('a.btn, a.button, a[class*="apply"], a[class*="cta"], button[onclick]').each((_, el) => {
+                    if (applyNowLink) return false;
+                    const href = $(el).attr('href') || '';
+                    const text = $(el).text().trim();
+                    if (href.startsWith('http') && applyKeywords.test(text)) {
+                        applyNowLink = href;
+                    }
+                });
+            }
+
+            if (applyNowLink) {
+                console.log(`   🎯 Found Apply Now link: ${applyNowLink.substring(0, 80)}...`);
+            }
             
             return {
                 title: title.trim().substring(0, 500),
                 text: text,
                 html: response.data.substring(0, 50000),
-                metadata: metadata
+                metadata: metadata,
+                applyNowLink: applyNowLink
             };
             
         } catch (error) {
@@ -489,6 +534,33 @@ class TelegramService {
                     published_time: getMeta('', 'article:published_time')
                 };
             });
+
+            // Extract "Apply Now" link via Puppeteer
+            const applyNowLink = await page.evaluate(() => {
+                const applyKeywords = /apply\s*now|mohon\s*sekarang|permohonan|daftar\s*sekarang|register\s*now|submit\s*application|hantar\s*permohonan|klik\s*sini|click\s*here\s*to\s*apply/i;
+                const links = document.querySelectorAll('a[href]');
+                for (const link of links) {
+                    const text = link.textContent.trim();
+                    const href = link.href;
+                    if (href && text && applyKeywords.test(text) && href.startsWith('http')) {
+                        return href;
+                    }
+                }
+                // Also check buttons with apply classes
+                const btns = document.querySelectorAll('a.btn, a.button, a[class*="apply"], a[class*="cta"]');
+                for (const btn of btns) {
+                    const text = btn.textContent.trim();
+                    const href = btn.href;
+                    if (href && text && applyKeywords.test(text) && href.startsWith('http')) {
+                        return href;
+                    }
+                }
+                return null;
+            });
+
+            if (applyNowLink) {
+                console.log(`   🎯 Found Apply Now link: ${applyNowLink.substring(0, 80)}...`);
+            }
             
             await page.close();
             
@@ -503,7 +575,8 @@ class TelegramService {
                 title: content.title.trim().substring(0, 500),
                 text: cleanText,
                 html: content.html.substring(0, 50000),
-                metadata: metadata
+                metadata: metadata,
+                applyNowLink: applyNowLink
             };
             
         } catch (error) {

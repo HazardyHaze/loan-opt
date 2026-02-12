@@ -4,15 +4,15 @@
 
       <!-- Navigation -->
     <nav class="shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center">
             <div class="flex-shrink-0 flex items-center">
               <span class="ml-2 text-xl font-bold text-white">LoanOptimizer</span>
             </div>
           </div>
-          <div class="hidden md:block">
-            <div class="ml-10 flex items-baseline space-x-4">
+          <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2">
+            <div class="flex items-baseline space-x-4">
               <!-- Dashboard link -->
               <button 
                 @click="goToDashboard"
@@ -37,7 +37,7 @@
                   <div class="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
                     <UserIcon class="h-5 w-5 text-green-600" />
                   </div>
-                  <span>John Doe</span>
+                  <span>{{ userName }}</span>
                   <ChevronDownIcon class="h-4 w-4" />
                 </button>
                 
@@ -168,10 +168,11 @@
                   type="number"
                   min="0"
                   max="4"
-                  step="0.1"
+                  step="0.01"
                   required
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                  placeholder="Enter your GPA (0.0 - 4.0)"
+                  placeholder="Enter your GPA (0.00 - 4.00)"
+                  @blur="form.gpa = parseFloat(Number(form.gpa).toFixed(2)) || 0"
                 >
               </div>
 
@@ -203,12 +204,13 @@
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
                 >
                   <option value="">Select academic level</option>
-                  <option value="Undergraduate">Undergraduate</option>
-                  <option value="Graduate">Graduate</option>
-                  <option value="Postgraduate">Postgraduate</option>
-                  <option value="PhD">PhD</option>
-                  <option value="Diploma">Diploma</option>
+                  <option value="SPM">SPM</option>
+                  <option value="SPTM">SPTM</option>
                   <option value="Certificate">Certificate</option>
+                  <option value="Diploma">Diploma</option>
+                  <option value="Degree">Degree</option>
+                  <option value="Master">Masters</option>
+                  <option value="PhD">PhD</option>
                 </select>
               </div>
 
@@ -232,14 +234,30 @@
                 <label for="major" class="block text-sm font-medium text-gray-700 mb-2">
                   Major/Field of Study *
                 </label>
-                <input
+                <select
                   id="major"
                   v-model="form.major"
-                  type="text"
                   required
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                  placeholder="Enter your major or field of study"
                 >
+                  <option value="">Select your field of study</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Business">Business</option>
+                  <option value="Economic">Economic</option>
+                  <option value="Account">Account</option>
+                  <option value="Human Resource">Human Resource</option>
+                  <option value="Banking">Banking</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Graphic Design">Graphic Design</option>
+                  <option value="Multimedia">Multimedia</option>
+                  <option value="Information System">Information System</option>
+                  <option value="Animation">Animation</option>
+                  <option value="Farmasi">Farmasi</option>
+                  <option value="Perubatan">Perubatan</option>
+                  <option value="Pergigian">Pergigian</option>
+                  <option value="Accounting">Accounting</option>
+                  <option value="Finance">Finance</option>
+                </select>
               </div>
             </div>
           </div>
@@ -269,11 +287,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '~~/utils/supabase'
 
 const router = useRouter()
+
+// Initialize Supabase client
+let supabase = null
+const initSupabase = async () => {
+  const { createClient } = await import('@supabase/supabase-js')
+  supabase = createClient(
+    'https://wlwsjwdmbcxrryqlpjxo.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indsd3Nqd2RtYmN4cnJ5cWxwanhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2MzUxNDcsImV4cCI6MjA3NzIxMTE0N30.mWPU2-LvX0LgeQVx7Ixs-emgLXRt9LYn-cxPLeOgzDY'
+  )
+}
 
 // Form data
 const form = ref({
@@ -288,56 +315,56 @@ const form = ref({
   major: ''
 })
 
+const showUserMenu = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const currentUser = ref(null)
+const originalEmail = ref('')
+const userName = ref('User')
 
-// Fetch current user data
+// Fetch current user data from localStorage + database
 const fetchUserData = async () => {
   try {
     loading.value = true
-    
-    // Get current user from Supabase Auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      throw new Error('User not authenticated')
-    }
-    
-    currentUser.value = user
 
-    // Fetch user data from User table
-    const { data: userData, error: userError } = await supabase
-      .from('User')
+    // Get student data from localStorage (set during login)
+    const storedData = localStorage.getItem('studentData')
+    if (!storedData) {
+      errorMessage.value = 'Not logged in. Redirecting...'
+      setTimeout(() => navigateTo('/login'), 1500)
+      return
+    }
+
+    const parsed = JSON.parse(storedData)
+    const studentId = parsed.id || parsed.student_id
+
+    if (!supabase) await initSupabase()
+
+    // Fetch full student record from database
+    const { data: studentData, error } = await supabase
+      .from('student')
       .select('*')
-      .eq('email', user.email)
+      .eq('student_id', studentId)
       .single()
 
-    if (userError) throw userError
+    if (error) throw error
 
-    // Update form with user data
-    form.value.name = userData.name
-    form.value.email = userData.email
-    form.value.student_id = userData.student_id
+    // Populate form
+    form.value.student_id = studentData.student_id
+    form.value.email = studentData.email
+    form.value.phone_no = studentData.phone_no || ''
+    form.value.gpa = studentData.gpa || 0
+    form.value.family_income = studentData.family_income || 0
+    form.value.academic_level = studentData.academic_level || ''
+    form.value.institution = studentData.institution || ''
+    form.value.major = studentData.major || ''
+    form.value.name = parsed.name || ''
 
-    // If user is a student, fetch student data
-    if (userData.student_id) {
-      const { data: studentData, error: studentError } = await supabase
-        .from('Student')
-        .select('*')
-        .eq('student_id', userData.student_id)
-        .single()
+    // Set display name
+    userName.value = parsed.name || studentData.email || 'User'
 
-      if (studentError) throw studentError
-
-      // Update form with student data
-      form.value.phone_no = studentData.phone_no
-      form.value.gpa = studentData.gpa
-      form.value.family_income = studentData.family_income
-      form.value.academic_level = studentData.academic_level
-      form.value.institution = studentData.institution
-      form.value.major = studentData.major
-    }
+    // Remember original email for the update query
+    originalEmail.value = studentData.email
 
   } catch (error) {
     console.error('Error fetching user data:', error)
@@ -347,14 +374,13 @@ const fetchUserData = async () => {
   }
 }
 
-// Form submission handler
+// Form submission handler — saves to the student table
 const handleSubmit = async () => {
-  // Reset messages
   errorMessage.value = ''
   successMessage.value = ''
 
   // Validation
-  if (!form.value.name || !form.value.email || !form.value.phone_no) {
+  if (!form.value.email || !form.value.phone_no) {
     errorMessage.value = 'Please fill in all required fields!'
     return
   }
@@ -372,23 +398,15 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    // Update User table
-    const { error: userError } = await supabase
-      .from('User')
-      .update({
-        name: form.value.name,
-        email: form.value.email
-      })
-      .eq('email', currentUser.value.email)
+    if (!supabase) await initSupabase()
 
-    if (userError) throw userError
-
-    // Update Student table
-    const { error: studentError } = await supabase
-      .from('Student')
+    // Update the student table using student_id as the key
+    const { error } = await supabase
+      .from('student')
       .update({
-        phone_no: parseInt(form.value.phone_no),
-        gpa: parseInt(form.value.gpa),
+        email: form.value.email,
+        phone_no: form.value.phone_no,
+        gpa: parseFloat(form.value.gpa),
         family_income: parseInt(form.value.family_income),
         academic_level: form.value.academic_level,
         institution: form.value.institution,
@@ -396,11 +414,34 @@ const handleSubmit = async () => {
       })
       .eq('student_id', form.value.student_id)
 
-    if (studentError) throw studentError
+    if (error) throw error
 
+    // Also update localStorage so the rest of the app sees the new data
+    const updatedData = {
+      id: form.value.student_id,
+      student_id: form.value.student_id,
+      email: form.value.email,
+      name: form.value.name,
+      phone: form.value.phone_no,
+      gpa: form.value.gpa,
+      institution: form.value.institution,
+      major: form.value.major
+    }
+    localStorage.setItem('studentData', JSON.stringify(updatedData))
+
+    // Update the session email if it changed
+    const session = localStorage.getItem('studentSession') || sessionStorage.getItem('studentSession')
+    if (session) {
+      const sessionData = JSON.parse(session)
+      sessionData.email = form.value.email
+      sessionData.phone_no = form.value.phone_no
+      sessionData.name = form.value.name
+      localStorage.setItem('studentSession', JSON.stringify(sessionData))
+    }
+
+    originalEmail.value = form.value.email
     successMessage.value = 'Profile updated successfully!'
-    
-    // Clear success message after 3 seconds
+
     setTimeout(() => {
       successMessage.value = ''
     }, 3000)
@@ -418,7 +459,6 @@ const navigateToDashboard = () => {
   router.push('/user/dashboard')
 }
 
-// Fetch user data when component mounts
 onMounted(() => {
   fetchUserData()
 })
@@ -437,9 +477,11 @@ const goToProfile = () => {
 }
 
 const handleLogout = () => {
-  // Clear user data
-  localStorage.removeItem('userToken')
-  localStorage.removeItem('userData')
+  // Clear all session data
+  localStorage.removeItem('studentSession')
+  localStorage.removeItem('isAuthenticated')
+  localStorage.removeItem('studentData')
+  sessionStorage.removeItem('studentSession')
   
   // Redirect to login
   navigateTo('/login')
@@ -455,9 +497,6 @@ const handleClickOutside = (event) => {
     showUserMenu.value = false
   }
 }
-
-// Add click event listener
-import { onUnmounted } from 'vue'
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)

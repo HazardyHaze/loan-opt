@@ -2,6 +2,7 @@
 require('dotenv').config({ path: `${__dirname}/../.env` });
 const TelegramService = require('./services/telegramService');
 const SupabaseService = require('./services/supabaseService');
+const ContentProcessor = require('./services/contentProcessor');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -14,10 +15,12 @@ async function main() {
         // Initialize services
         telegram = new TelegramService();
         supabase = new SupabaseService();
+        const processor = new ContentProcessor();
         
         console.log('🔄 Initializing services...');
         await telegram.initialize();
         await supabase.initialize();
+        await processor.initialize(supabase);
         
         console.log('✅ Services initialized');
         
@@ -47,16 +50,30 @@ async function main() {
         
         let totalLinks = 0;
         let totalScraped = 0;
+        let totalSaved = 0;
         
         // Process and save each post
         for (const post of posts) {
             totalLinks += post.links.length;
             totalScraped += post.scraped_contents.length;
             
+            // Enrich post with extracted amount and deadline
+            const enrichedPost = processor.enrichPost(post);
+            
             // Save to database
             try {
-                await supabase.savePost(post);
-                console.log(`   ✓ Saved post ${post.telegram_id} with ${post.scraped_contents.length} scraped links`);
+                await supabase.savePost(enrichedPost);
+                totalSaved++;
+                const scrapedLinks = (post.scraped_contents || []).filter(sc => !sc.error).length;
+                console.log(`   ✓ Saved post ${post.telegram_id}`);
+                console.log(`     � Name: ${enrichedPost.loan_name || 'Not found'}`);
+                console.log(`     💰 Amount: ${enrichedPost.amount || 'Not found'}`);
+                console.log(`     📂 Opening: ${enrichedPost.opening_date || 'Not found'}`);
+                console.log(`     📅 Deadline: ${enrichedPost.deadline || 'Not found'}`);
+                console.log(`     🎓 Courses: ${enrichedPost.course ? enrichedPost.course.substring(0, 80) + (enrichedPost.course.length > 80 ? '...' : '') : 'Not found'}`);
+                console.log(`     👥 Eligibility: ${enrichedPost.eligibility || 'Not found'}`);
+                console.log(`     🔗 Link: ${enrichedPost.link || 'None'}`);
+                console.log(`     📄 Scraped ${scrapedLinks} link(s) content`);
             } catch (saveError) {
                 console.error(`   ✗ Failed to save post ${post.telegram_id}:`, saveError.message);
             }
@@ -64,6 +81,7 @@ async function main() {
         
         console.log(`\n📈 Summary:`);
         console.log(`   Posts found: ${posts.length}`);
+        console.log(`   Posts saved: ${totalSaved}`);
         console.log(`   Links found: ${totalLinks}`);
         console.log(`   Links successfully scraped: ${totalScraped}`);
         

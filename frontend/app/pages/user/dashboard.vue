@@ -4,15 +4,15 @@
 
     <!-- Navigation -->
     <nav class="shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center">
             <div class="flex-shrink-0 flex items-center">
               <span class="ml-2 text-xl font-bold text-white">LoanOptimizer</span>
             </div>
           </div>
-          <div class="hidden md:block">
-            <div class="ml-10 flex items-baseline space-x-4">
+          <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2">
+            <div class="flex items-baseline space-x-4">
               <!-- Dashboard link -->
               <button 
                 @click="goToDashboard"
@@ -37,7 +37,7 @@
                   <div class="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
                     <UserIcon class="h-5 w-5 text-green-600" />
                   </div>
-                  <span>John Doe</span>
+                  <span>{{ userName }}</span>
                   <ChevronDownIcon class="h-4 w-4" />
                 </button>
                 
@@ -68,7 +68,7 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Welcome Section -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-white">Welcome back, John! 👋</h1>
+        <h1 class="text-3xl font-bold text-white">Welcome back, {{ firstName }}! 👋</h1>
         <p class="text-white mt-2">Here's your scholarship application overview</p>
       </div>
 
@@ -100,35 +100,49 @@
         <!-- Scholarship Matches Section -->
         <div class="bg-white rounded-xl shadow-sm p-6">
           <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-semibold text-gray-900">Scholarship Matches</h2>
+            <h2 class="text-xl font-semibold text-gray-900">Top Matches</h2>
             <button 
             @click="navigateToMatching"
             class="text-green-600 hover:text-green-700 text-sm font-medium">
               View All
             </button>
           </div>
-          <div class="space-y-4">
-            <div v-for="match in scholarshipMatches" :key="match.id" class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-green-300 transition duration-200">
-              <div class="flex items-center space-x-4">
-                <div class="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <AcademicCapIcon class="h-6 w-6 text-green-600" />
+
+          <!-- Loading state -->
+          <div v-if="matchesLoading" class="text-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+            <p class="mt-3 text-sm text-gray-500">Loading matches...</p>
+          </div>
+
+          <!-- Matches list -->
+          <div v-else-if="topMatches.length > 0" class="space-y-3">
+            <div v-for="match in topMatches" :key="match.id" class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-green-300 transition duration-200">
+              <div class="flex items-center space-x-4 flex-1 min-w-0">
+                <div class="h-10 w-10 flex-shrink-0 rounded-lg flex items-center justify-center"
+                     :class="match.matchLevel === 'High' ? 'bg-green-100' : match.matchLevel === 'Medium' ? 'bg-yellow-100' : 'bg-red-100'">
+                  <AcademicCapIcon class="h-6 w-6" :class="match.matchLevel === 'High' ? 'text-green-600' : match.matchLevel === 'Medium' ? 'text-yellow-600' : 'text-red-500'" />
                 </div>
-                <div>
-                  <h3 class="font-medium text-gray-900">{{ match.name }}</h3>
-                  <p class="text-sm text-gray-500">Deadline: {{ match.deadline }}</p>
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-medium text-gray-900 truncate">{{ match.name }}</h3>
+                  <p class="text-sm text-gray-500">{{ match.deadlineText }}</p>
                 </div>
               </div>
-              <div class="text-right">
-                <p class="font-semibold text-gray-900">{{ match.amount }}</p>
-                <span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', 
-                  match.matchLevel === 'High' ? 'bg-green-100 text-green-800' :
-                  match.matchLevel === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-blue-100 text-blue-800'
+              <div class="text-right flex-shrink-0 ml-4">
+                <p class="font-semibold text-gray-900">{{ match.amountText }}</p>
+                <span :class="['inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold', 
+                  match.matchLevel === 'High' ? 'bg-green-100 text-green-700' :
+                  match.matchLevel === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
                 ]">
-                  {{ match.matchLevel }} Match
+                  {{ match.matchIcon }} {{ match.matchLevel }}
                 </span>
               </div>
             </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-else class="text-center py-8">
+            <p class="text-gray-500">No matches found. <button @click="navigateToMatching" class="text-green-600 hover:underline">Browse all</button></p>
           </div>
         </div>
       </div>
@@ -140,11 +154,158 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
 const unreadNotifications = ref(3)
+
+// Supabase client
+let supabase = null
+const initSupabase = async () => {
+  const { createClient } = await import('@supabase/supabase-js')
+  supabase = createClient(
+    'https://wlwsjwdmbcxrryqlpjxo.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indsd3Nqd2RtYmN4cnJ5cWxwanhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2MzUxNDcsImV4cCI6MjA3NzIxMTE0N30.mWPU2-LvX0LgeQVx7Ixs-emgLXRt9LYn-cxPLeOgzDY'
+  )
+}
+
+// User name from session
+const userName = ref('Student')
+const userGpa = ref(0)
+const userIncome = ref(0)
+const userMajor = ref('')
+const firstName = computed(() => {
+  const parts = userName.value.trim().split(/\s+/)
+  return parts.length > 1 ? parts[parts.length - 1] : parts[0]
+})
+
+// Load user data from localStorage
+const loadUserData = () => {
+  try {
+    const stored = localStorage.getItem('studentData')
+    if (stored) {
+      const data = JSON.parse(stored)
+      if (data.name) userName.value = data.name
+      if (data.gpa) userGpa.value = parseFloat(data.gpa) || 0
+      if (data.family_income) userIncome.value = parseInt(data.family_income) || 0
+      if (data.major) userMajor.value = data.major
+    }
+  } catch (e) {
+    console.error('Error loading user data:', e)
+  }
+}
+
+// --- Matching Algorithm (same as matching page) ---
+const getMatchLevel = (post) => {
+  let score = 0
+  let factors = 0
+
+  // CGPA (0-40)
+  if (post.eligibility && userGpa.value > 0) {
+    factors++
+    const requiredCgpa = parseFloat(post.eligibility)
+    if (!isNaN(requiredCgpa)) {
+      if (userGpa.value >= requiredCgpa) {
+        const excess = Math.min(userGpa.value - requiredCgpa, 1.0)
+        score += 25 + (excess / 1.0) * 15
+      } else {
+        const gap = requiredCgpa - userGpa.value
+        score += Math.max(0, 15 - (gap / 1.0) * 15)
+      }
+    }
+  } else if (userGpa.value > 0) {
+    factors++
+    score += (userGpa.value / 4.0) * 30
+  }
+
+  // Family Income (0-30) — lower = higher match
+  if (userIncome.value > 0) {
+    factors++
+    if (userIncome.value <= 2500) score += 30
+    else if (userIncome.value <= 5000) score += 22
+    else if (userIncome.value <= 8000) score += 14
+    else if (userIncome.value <= 12000) score += 7
+    else score += 2
+  }
+
+  // Field of Study (0-30)
+  if (userMajor.value && post.course) {
+    factors++
+    const postCourses = post.course.toLowerCase()
+    const studentMajor = userMajor.value.toLowerCase()
+    if (postCourses.includes('all courses') || postCourses.includes('semua')) score += 30
+    else if (postCourses.includes(studentMajor)) score += 30
+    else score += 5
+  } else if (!post.course) {
+    factors++
+    score += 15
+  }
+
+  const normalised = factors > 0 ? (score / (factors * (100 / 3))) * 100 : 50
+
+  if (normalised >= 65) return { level: 'High', icon: '\uD83D\uDFE2' }
+  if (normalised >= 40) return { level: 'Medium', icon: '\uD83D\uDFE1' }
+  return { level: 'Low', icon: '\uD83D\uDD34' }
+}
+
+// --- Top Matches from DB ---
+const matchesLoading = ref(true)
+const topMatches = ref([])
+
+const extractTitle = (text) => {
+  if (!text) return 'Untitled Opportunity'
+  const firstLine = text.split('\n').find(l => l.trim().length > 5) || text
+  const cleaned = firstLine.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim()
+  return cleaned.length > 80 ? cleaned.substring(0, 80) + '...' : cleaned
+}
+
+const formatDeadline = (deadline) => {
+  if (!deadline) return 'No deadline'
+  const date = new Date(deadline)
+  const now = new Date()
+  const diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 'Expired'
+  if (diffDays === 0) return 'Due today!'
+  if (diffDays <= 7) return `${diffDays} days left`
+  return date.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const fetchTopMatches = async () => {
+  try {
+    matchesLoading.value = true
+    if (!supabase) await initSupabase()
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .order('date', { ascending: false })
+
+    if (error) throw error
+
+    // Score all posts and pick top 5 by match level
+    const matchRank = { 'High': 3, 'Medium': 2, 'Low': 1 }
+    const scored = (data || []).map(post => {
+      const match = getMatchLevel(post)
+      return {
+        id: post.id,
+        name: extractTitle(post.message_text),
+        amountText: post.amount ? `RM ${Number(post.amount).toLocaleString()}` : 'Amount TBD',
+        deadlineText: formatDeadline(post.deadline),
+        matchLevel: match.level,
+        matchIcon: match.icon,
+        _rank: matchRank[match.level] || 0
+      }
+    })
+
+    scored.sort((a, b) => b._rank - a._rank)
+    topMatches.value = scored.slice(0, 5)
+  } catch (e) {
+    console.error('Error fetching matches:', e)
+  } finally {
+    matchesLoading.value = false
+  }
+}
 
 const goToDashboard = () => {
   navigateTo('/user/dashboard')
@@ -164,14 +325,11 @@ const goToProfile = () => {
 }
 
 const handleLogout = () => {
-  // Clear user data
-  localStorage.removeItem('userToken')
-  localStorage.removeItem('userData')
-  
-  // Redirect to login
+  localStorage.removeItem('studentSession')
+  localStorage.removeItem('isAuthenticated')
+  localStorage.removeItem('studentData')
+  sessionStorage.removeItem('studentSession')
   navigateTo('/login')
-  
-  // Close dropdown
   showUserMenu.value = false
 }
 
@@ -183,10 +341,9 @@ const handleClickOutside = (event) => {
   }
 }
 
-// Add click event listener
-import { onMounted, onUnmounted } from 'vue'
-
-onMounted(() => {
+onMounted(async () => {
+  loadUserData()
+  await fetchTopMatches()
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -236,96 +393,7 @@ const documents = ref([
 
 const documentsPrepared = computed(() => documents.value.filter(doc => doc.prepared).length)
 
-// Sample data
-const scholarshipMatches = ref([
-  {
-    id: 1,
-    name: 'STEM Excellence Scholarship',
-    deadline: 'Mar 15, 2024',
-    amount: '$10,000',
-    matchLevel: 'High'
-  },
-  {
-    id: 2,
-    name: 'Community Service Award',
-    deadline: 'Apr 1, 2024',
-    amount: '$5,000',
-    matchLevel: 'Medium'
-  },
-  {
-    id: 3,
-    name: 'First Generation Scholarship',
-    deadline: 'May 30, 2024',
-    amount: '$7,500',
-    matchLevel: 'High'
-  }
-])
 
-const savedScholarships = ref([
-  {
-    id: 1,
-    name: 'Technology Innovation Grant',
-    description: 'For students pursuing computer science and engineering',
-    amount: '$15,000',
-    deadline: '2 days left',
-    deadlineStatus: 'urgent'
-  },
-  {
-    id: 2,
-    name: 'Leadership Excellence Award',
-    description: 'Recognizing outstanding leadership in community service',
-    amount: '$8,000',
-    deadline: '1 week left',
-    deadlineStatus: 'soon'
-  },
-  {
-    id: 3,
-    name: 'Future Educators Scholarship',
-    description: 'Supporting aspiring teachers in their educational journey',
-    amount: '$6,000',
-    deadline: '1 month left',
-    deadlineStatus: 'later'
-  }
-])
-
-const applications = ref([
-  {
-    id: 1,
-    name: 'STEM Excellence Scholarship',
-    amount: '$10,000',
-    status: 'submitted',
-    statusDisplay: 'Submitted',
-    submittedDate: 'Feb 12, 2024',
-    deadline: 'Mar 15, 2024'
-  },
-  {
-    id: 2,
-    name: 'Community Service Award',
-    amount: '$5,000',
-    status: 'in-progress',
-    statusDisplay: 'In Progress',
-    submittedDate: '-',
-    deadline: 'Apr 1, 2024'
-  },
-  {
-    id: 3,
-    name: 'First Generation Scholarship',
-    amount: '$7,500',
-    status: 'draft',
-    statusDisplay: 'Draft',
-    submittedDate: '-',
-    deadline: 'May 30, 2024'
-  },
-  {
-    id: 4,
-    name: 'Technology Innovation Grant',
-    amount: '$15,000',
-    status: 'rejected',
-    statusDisplay: 'Not Selected',
-    submittedDate: 'Jan 20, 2024',
-    deadline: 'Feb 1, 2024'
-  }
-])
 
 // Icon components
 const BanknotesIcon = {
