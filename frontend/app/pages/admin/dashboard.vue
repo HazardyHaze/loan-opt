@@ -195,6 +195,7 @@ onUnmounted(() => clearInterval(timeInterval))
 
 const logout = () => {
   localStorage.removeItem('adminToken')
+  localStorage.removeItem('isAuthenticated')
   router.push('/login')
 }
 </script>

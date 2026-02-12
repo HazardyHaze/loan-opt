@@ -433,7 +433,7 @@ onMounted(async () => {
   await fetchStudents()
 })
 
-const logout = () => { localStorage.removeItem('adminToken'); router.push('/login') }
+const logout = () => { localStorage.removeItem('adminToken'); localStorage.removeItem('isAuthenticated'); router.push('/login') }
 </script>
 
 <style scoped>

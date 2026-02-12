@@ -219,33 +219,7 @@ const initSupabase = async () => {
   }
 }
 
-// Find correct table name (handles case sensitivity)
-const findStudentTable = async () => {
-  try {
-    // List all tables in public schema
-    const { data: tables, error } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-    
-    if (error) {
-      console.error('Error fetching tables:', error)
-      return 'student' // default fallback
-    }
-    
-    // Find student table (case-insensitive)
-    const studentTable = tables?.find(table => 
-      table.table_name.toLowerCase() === 'student'
-    )
-    
-    return studentTable ? studentTable.table_name : 'student'
-  } catch (err) {
-    console.error('Error finding table:', err)
-    return 'student'
-  }
-}
-
-// Form submission handler - authenticates against student table
+// Form submission handler - checks both admin and student tables
 const handleSubmit = async () => {
   clearMessages()
   
@@ -265,43 +239,68 @@ const handleSubmit = async () => {
       }
     }
     
-    debugInfo.value = 'Looking up student in database...'
-    
-    // Find the correct table name
-    const tableName = await findStudentTable()
-    console.log(`Using table: ${tableName}`)
-    
-    // Query the student table for matching email
-    const { data: students, error: queryError } = await supabase
-      .from(tableName)
+    debugInfo.value = 'Looking up account...'
+
+    // 1) Check the admin table first
+    const { data: admins, error: adminError } = await supabase
+      .from('admin')
+      .select('*')
+      .eq('email', form.value.email)
+      .limit(1)
+
+    if (adminError) {
+      console.error('Admin query error:', adminError)
+    }
+
+    if (admins && admins.length > 0) {
+      const admin = admins[0]
+
+      // Verify password
+      if (admin.password !== form.value.password) {
+        throw new Error('Incorrect password')
+      }
+
+      debugInfo.value = 'Admin login successful!'
+      successMessage.value = 'Welcome, Admin! Redirecting to dashboard...'
+
+      // Store admin session
+      localStorage.setItem('adminToken', JSON.stringify({
+        admin_id: admin.admin_id,
+        email: admin.email,
+        permission_level: admin.permission_level,
+        loggedIn: true,
+        timestamp: new Date().toISOString()
+      }))
+      localStorage.setItem('isAuthenticated', 'true')
+
+      // Redirect to admin dashboard
+      setTimeout(() => {
+        router.push('/admin/dashboard')
+      }, 1500)
+      return
+    }
+
+    // 2) Check the student table
+    debugInfo.value = 'Checking student account...'
+
+    const { data: students, error: studentError } = await supabase
+      .from('student')
       .select('*')
       .eq('email', form.value.email)
       .limit(1)
     
-    if (queryError) {
-      console.error('Database query error:', queryError)
-      
-      // Check if table doesn't exist
-      if (queryError.message.includes('does not exist')) {
-        throw new Error('Student table not found in database')
-      }
-      
-      throw new Error(`Database error: ${queryError.message}`)
+    if (studentError) {
+      console.error('Student query error:', studentError)
+      throw new Error(`Database error: ${studentError.message}`)
     }
     
-    debugInfo.value = `Found ${students?.length || 0} matching student(s)`
-    
-    // Check if student exists
     if (!students || students.length === 0) {
       throw new Error('No account found with this email address')
     }
     
     const student = students[0]
-    console.log('Found student:', student)
-    
-    // Verify password (in production, compare hashed passwords!)
-    // IMPORTANT: In production, you should hash the input password and compare
-    // Currently this compares plain text (NOT SECURE for production!)
+
+    // Verify password
     if (student.password !== form.value.password) {
       throw new Error('Incorrect password')
     }
@@ -340,7 +339,7 @@ const handleSubmit = async () => {
       major: student.major
     }))
     
-    // Redirect to dashboard after successful login
+    // Redirect to student dashboard after successful login
     setTimeout(() => {
       router.push('/user/dashboard')
     }, 1500)
@@ -354,25 +353,6 @@ const handleSubmit = async () => {
   }
 }
 
-// Check if user is already logged in (optional)
-const checkExistingSession = () => {
-  const session = localStorage.getItem('studentSession') || sessionStorage.getItem('studentSession')
-  if (session) {
-    try {
-      const userData = JSON.parse(session)
-      // Check if session is not expired (optional: add expiry check)
-      if (userData.loggedIn) {
-        successMessage.value = 'Welcome back! Redirecting...'
-        setTimeout(() => {
-          router.push('/user/dashboard')
-        }, 1000)
-      }
-    } catch (e) {
-      console.log('No valid session found')
-    }
-  }
-}
-
 // Navigation functions
 const navigateToRegister = () => {
   router.push('/register')
@@ -381,10 +361,4 @@ const navigateToRegister = () => {
 const navigateToForgotPassword = () => {
   router.push('/user/forgot-password')
 }
-
-// Check for existing session when component mounts
-import { onMounted } from 'vue'
-onMounted(() => {
-  checkExistingSession()
-})
 </script>
