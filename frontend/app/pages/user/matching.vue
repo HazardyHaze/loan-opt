@@ -499,33 +499,39 @@ const formatDeadline = (deadline) => {
  * Returns { level: 'High'|'Medium'|'Low', color classes }
  */
 const getMatchLevel = (product) => {
+  const hasProfile = userGpa.value > 0 || userIncome.value > 0 || !!userMajor.value
+
+  // If user has not filled in any profile data, always Low
+  if (!hasProfile) {
+    return { level: 'Low', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: '🔴' }
+  }
+
   let score = 0
-  let factors = 0
+  let maxScore = 0
 
   // --- CGPA Score (0-40 points) ---
-  if (product.eligibility && userGpa.value > 0) {
-    factors++
-    const requiredCgpa = parseFloat(product.eligibility)
-    if (!isNaN(requiredCgpa)) {
-      if (userGpa.value >= requiredCgpa) {
-        // Meets requirement: scale 25-40 based on how much they exceed
-        const excess = Math.min(userGpa.value - requiredCgpa, 1.0)
-        score += 25 + (excess / 1.0) * 15
-      } else {
-        // Below requirement: scale 0-15 based on how close
-        const gap = requiredCgpa - userGpa.value
-        score += Math.max(0, 15 - (gap / 1.0) * 15)
+  if (userGpa.value > 0) {
+    maxScore += 40
+    if (product.eligibility) {
+      const requiredCgpa = parseFloat(product.eligibility)
+      if (!isNaN(requiredCgpa)) {
+        if (userGpa.value >= requiredCgpa) {
+          // Meets requirement: scale 28-40 based on how much they exceed
+          const excess = Math.min(userGpa.value - requiredCgpa, 1.0)
+          score += 28 + (excess / 1.0) * 12
+        } else {
+          // Below requirement: scale 0-10 based on how close
+          const gap = requiredCgpa - userGpa.value
+          score += Math.max(0, 10 - (gap / 1.0) * 10)
+        }
       }
     }
-  } else if (userGpa.value > 0) {
-    // No CGPA requirement — reward higher GPA generically
-    factors++
-    score += (userGpa.value / 4.0) * 30
+    // If post has no CGPA requirement, give a small neutral score (not a free pass)
   }
 
   // --- Family Income Score (0-30 points) — lower income = higher match ---
   if (userIncome.value > 0) {
-    factors++
+    maxScore += 30
     if (userIncome.value <= 2500) {
       score += 30   // B40 range — highest match
     } else if (userIncome.value <= 5000) {
@@ -540,29 +546,27 @@ const getMatchLevel = (product) => {
   }
 
   // --- Field of Study Score (0-30 points) ---
-  if (userMajor.value && product.course) {
-    factors++
-    const postCourses = product.course.toLowerCase()
-    const studentMajor = userMajor.value.toLowerCase()
-    if (postCourses.includes('all courses') || postCourses.includes('semua')) {
-      score += 30   // Open to all — full match
-    } else if (postCourses.includes(studentMajor)) {
-      score += 30   // Direct field match
-    } else {
-      score += 5    // No field match
+  if (userMajor.value) {
+    maxScore += 30
+    if (product.course) {
+      const postCourses = product.course.toLowerCase()
+      const studentMajor = userMajor.value.toLowerCase()
+      if (postCourses.includes('all courses') || postCourses.includes('semua')) {
+        score += 30   // Open to all — full match
+      } else if (postCourses.includes(studentMajor)) {
+        score += 30   // Direct field match
+      } else {
+        score += 3    // No field match — minimal score
+      }
     }
-  } else if (!product.course) {
-    // No course specified — neutral
-    factors++
-    score += 15
+    // If post has no course specified, give nothing — can't confirm a match
   }
 
-  // Normalise to 0-100 if we have factors
-  const maxPossible = factors > 0 ? factors * (100 / 3) : 1
-  const normalised = factors > 0 ? (score / (factors * (100 / 3))) * 100 : 50
+  // Normalise to 0-100 based on actual max
+  const normalised = maxScore > 0 ? (score / maxScore) * 100 : 0
 
-  if (normalised >= 65) return { level: 'High', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', icon: '🟢' }
-  if (normalised >= 40) return { level: 'Medium', bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', icon: '🟡' }
+  if (normalised >= 70) return { level: 'High', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', icon: '🟢' }
+  if (normalised >= 45) return { level: 'Medium', bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', icon: '🟡' }
   return { level: 'Low', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: '🔴' }
 }
 

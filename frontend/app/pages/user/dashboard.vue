@@ -198,30 +198,36 @@ const loadUserData = () => {
 
 // --- Matching Algorithm (same as matching page) ---
 const getMatchLevel = (post) => {
+  const hasProfile = userGpa.value > 0 || userIncome.value > 0 || !!userMajor.value
+
+  // If user has not filled in any profile data, always Low
+  if (!hasProfile) {
+    return { level: 'Low', icon: '\uD83D\uDD34' }
+  }
+
   let score = 0
-  let factors = 0
+  let maxScore = 0
 
   // CGPA (0-40)
-  if (post.eligibility && userGpa.value > 0) {
-    factors++
-    const requiredCgpa = parseFloat(post.eligibility)
-    if (!isNaN(requiredCgpa)) {
-      if (userGpa.value >= requiredCgpa) {
-        const excess = Math.min(userGpa.value - requiredCgpa, 1.0)
-        score += 25 + (excess / 1.0) * 15
-      } else {
-        const gap = requiredCgpa - userGpa.value
-        score += Math.max(0, 15 - (gap / 1.0) * 15)
+  if (userGpa.value > 0) {
+    maxScore += 40
+    if (post.eligibility) {
+      const requiredCgpa = parseFloat(post.eligibility)
+      if (!isNaN(requiredCgpa)) {
+        if (userGpa.value >= requiredCgpa) {
+          const excess = Math.min(userGpa.value - requiredCgpa, 1.0)
+          score += 28 + (excess / 1.0) * 12
+        } else {
+          const gap = requiredCgpa - userGpa.value
+          score += Math.max(0, 10 - (gap / 1.0) * 10)
+        }
       }
     }
-  } else if (userGpa.value > 0) {
-    factors++
-    score += (userGpa.value / 4.0) * 30
   }
 
   // Family Income (0-30) — lower = higher match
   if (userIncome.value > 0) {
-    factors++
+    maxScore += 30
     if (userIncome.value <= 2500) score += 30
     else if (userIncome.value <= 5000) score += 22
     else if (userIncome.value <= 8000) score += 14
@@ -230,22 +236,21 @@ const getMatchLevel = (post) => {
   }
 
   // Field of Study (0-30)
-  if (userMajor.value && post.course) {
-    factors++
-    const postCourses = post.course.toLowerCase()
-    const studentMajor = userMajor.value.toLowerCase()
-    if (postCourses.includes('all courses') || postCourses.includes('semua')) score += 30
-    else if (postCourses.includes(studentMajor)) score += 30
-    else score += 5
-  } else if (!post.course) {
-    factors++
-    score += 15
+  if (userMajor.value) {
+    maxScore += 30
+    if (post.course) {
+      const postCourses = post.course.toLowerCase()
+      const studentMajor = userMajor.value.toLowerCase()
+      if (postCourses.includes('all courses') || postCourses.includes('semua')) score += 30
+      else if (postCourses.includes(studentMajor)) score += 30
+      else score += 3
+    }
   }
 
-  const normalised = factors > 0 ? (score / (factors * (100 / 3))) * 100 : 50
+  const normalised = maxScore > 0 ? (score / maxScore) * 100 : 0
 
-  if (normalised >= 65) return { level: 'High', icon: '\uD83D\uDFE2' }
-  if (normalised >= 40) return { level: 'Medium', icon: '\uD83D\uDFE1' }
+  if (normalised >= 70) return { level: 'High', icon: '\uD83D\uDFE2' }
+  if (normalised >= 45) return { level: 'Medium', icon: '\uD83D\uDFE1' }
   return { level: 'Low', icon: '\uD83D\uDD34' }
 }
 
@@ -361,26 +366,26 @@ const documents = ref([
   },
   {
     id: 2,
-    name: 'Tax Returns',
-    description: 'Last 2 years of federal tax returns',
-    prepared: false
-  },
-  {
-    id: 3,
     name: 'Identification',
     description: 'Government-issued ID or passport',
     prepared: false
   },
   {
-    id: 4,
+    id: 3,
     name: 'Bank Statements',
     description: 'Last 3 months of bank statements',
     prepared: false
   },
   {
-    id: 5,
+    id: 4,
     name: 'Academic Transcripts',
     description: 'High school or college transcripts',
+    prepared: false
+  },
+  {
+    id: 5,
+    name: 'Offer Letter',
+    description: 'Official offer letter from the institution',
     prepared: false
   },
   {
