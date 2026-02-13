@@ -116,6 +116,13 @@
               <option value="loan">Without Amount</option>
             </select>
 
+            <select v-model="filters.matchLevel" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+              <option value="all">All Match Levels</option>
+              <option value="High">🟢 High Match</option>
+              <option value="Medium">🟡 Medium Match</option>
+              <option value="Low">🔴 Low Match</option>
+            </select>
+
             <select v-model="filters.sortBy" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
               <option value="match">Sort by Match</option>
               <option value="deadline">Sort by Deadline</option>
@@ -345,6 +352,7 @@ const persistSavedItems = () => {
 // Filters
 const filters = ref({
   type: 'all',
+  matchLevel: 'all',
   sortBy: 'match'
 })
 
@@ -422,6 +430,11 @@ const filteredProducts = computed(() => {
     filtered = filtered.filter(p => p.amount != null)
   } else if (filters.value.type === 'loan') {
     filtered = filtered.filter(p => p.amount == null)
+  }
+
+  // Filter by match level
+  if (filters.value.matchLevel !== 'all') {
+    filtered = filtered.filter(p => getMatchLevel(p).level === filters.value.matchLevel)
   }
 
   // Sort
